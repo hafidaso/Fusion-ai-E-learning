@@ -64,5 +64,3 @@ To enable data persistence, run the following SQL scripts in your Supabase SQL E
 1. Ensure your core authentication tables match `supabase_roles_setup.sql` to manage `public.roles` mappings.
 2. Execute `supabase_elearning_schema.sql` to generate the foundational tables (`courses`, `course_modules`, `lessons`, `enrollments`, etc).
 
----
-*Built with ❤️ for ABA Technology*
