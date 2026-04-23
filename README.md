@@ -210,4 +210,3 @@ The UI uses a CSS custom property system with full dark/light mode support:
 | `--success` | `#4fdc9a` | *(same)* |
 | `--error` | `#f76f6f` | *(same)* |
 
-Fonts: `Inter` (Latin) + `IBM Plex Sans Arabic` (Arabic/RTL-ready, structure prepared for future i18n).
