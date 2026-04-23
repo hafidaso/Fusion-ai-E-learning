@@ -1,0 +1,4798 @@
+[
+  {
+    "_id": "69ea11e0223090cab4d07950",
+    "name": "LMS - Full Platform (Auth + Dashboard + Courses + Students + Generate + Publish)",
+    "variables": {},
+    "secrets": {},
+    "nodes": [
+      {
+        "position": {
+          "x": 0,
+          "y": 3898
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "b75f6bc3-49bf-432d-99eb-68cd9bf921c0",
+        "type": "trigger",
+        "data": {
+          "description": "Webhook trigger for /auth (login, signup, logout)",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "webhook",
+          "label": "WH Auth",
+          "inputs": {},
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "method": "post",
+            "respondType": "deferred",
+            "responseCode": 200,
+            "path": "/auth"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 284,
+          "y": 3898
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "ebd69815-39b8-4075-ad5a-9b8bd96428d4",
+        "type": "action",
+        "data": {
+          "description": "CORS handler for /auth",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Auth_CORS",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const method = (input.method || '').toLowerCase();\nconst cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization' };\nif (method === 'options') return { __cors: true, status: 204, headers: cors, body: '' };\nreturn { __cors: false, body: input.body || {}, headers: cors };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 568,
+          "y": 3898
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "a23d6d9f-b819-4b7a-8763-3afd821ee076",
+        "type": "action",
+        "data": {
+          "description": "Extracts action, email, password, full_name from body",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Auth_Extract",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const body = input.body || input;\nconst action    = (body.action    || '').trim();\nconst email     = (body.email     || '').trim().toLowerCase();\nconst password  = (body.password  || '').trim();\nconst full_name = (body.full_name || body.name || '').trim();\nconst role      = (body.role      || 'student').trim();\nconst user_id   = (body.user_id   || '').trim();\nif (!action) throw new Error('Missing: action');\nreturn { action, email, password, full_name, role, user_id, timestamp: new Date().toISOString() };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1136,
+          "y": 3734
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "e2591c7e-8e9d-4128-aa36-d14c26397857",
+        "type": "action",
+        "data": {
+          "description": "Builds INSERT SQL for signup",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Build_Signup_SQL",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const s = outputs['Auth_Extract'].success;\nconst e = v => String(v||'').replace(/'/g,\"''\");\nconst role = ['teacher','student'].includes(s.role) ? s.role : 'student';\nreturn {\n  insertUser: `INSERT INTO public.users_profile (email, full_name, password_hash, role, is_active) VALUES ('${e(s.email)}','${e(s.full_name)}','${e(s.password)}','${role}',true) RETURNING id, email, full_name, role;`,\n  logSignup:  `INSERT INTO public.auth_logs (email, action, status) VALUES ('${e(s.email)}','signup','success');`\n};"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1420,
+          "y": 3734
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "827c2a1d-c3c1-4d0c-a652-2dd70dda16b2",
+        "type": "action",
+        "data": {
+          "description": "Inserts new user",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "postgres action",
+          "label": "PG Insert User",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Build_Signup_SQL.success.insertUser}}"
+            },
+            "tableName": "users_profile"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1704,
+          "y": 3734
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "7eeba889-b89a-43d4-a1c0-dd87e0e7a322",
+        "type": "action",
+        "data": {
+          "description": "Logs signup action",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "postgres action",
+          "label": "PG Log Signup",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Build_Signup_SQL.success.logSignup}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "auth_logs"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2009.1073105611376,
+          "y": 3769.973563669037
+        },
+        "width": 220,
+        "height": 80,
+        "draggable": true,
+        "id": "e25aff15-2bdf-4b62-b312-701045869866",
+        "type": "display",
+        "data": {
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "media-log",
+          "label": "Log Signup OK",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": false
+            }
+          },
+          "parameters": {},
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1420,
+          "y": 3898
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "0fc443c1-dfb7-4388-a5c0-56e1eb3b2641",
+        "type": "action",
+        "data": {
+          "description": "Builds SELECT + UPDATE + log SQL for login",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Build_Login_SQL",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const s = outputs['Auth_Extract'].success;\nconst e = v => String(v||'').replace(/'/g,\"''\");\nreturn {\n  selectUser:      `SELECT id, email, full_name, role, password_hash FROM public.users_profile WHERE email = '${e(s.email)}' LIMIT 1;`,\n  updateLastLogin: `UPDATE public.users_profile SET last_login_at = NOW() WHERE email = '${e(s.email)}';`,\n  logLogin:        `INSERT INTO public.auth_logs (email, action, status) VALUES ('${e(s.email)}','login','success');`\n};"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1704,
+          "y": 3898
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "88a961ad-d94b-402a-ad6e-725700a0a3f2",
+        "type": "action",
+        "data": {
+          "description": "Fetches user by email",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "postgres action",
+          "label": "PG Select User",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Build_Login_SQL.success.selectUser}}"
+            },
+            "tableName": "users_profile"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1988,
+          "y": 3898
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "93fc7e5f-9ce8-4263-a86f-a8541db25141",
+        "type": "action",
+        "data": {
+          "description": "Validates password and returns user object",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Check_Login",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const rows = input.rows || input;\nconst user = Array.isArray(rows) ? rows[0] : rows;\nif (!user) throw new Error('User not found');\nconst inputPwd = String(outputs['Auth_Extract'].success.password || '').trim();\nif (user.password_hash !== inputPwd) throw new Error('Wrong password');\nreturn { user_id: user.id, email: user.email, full_name: user.full_name, role: user.role, token: user.id };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2272,
+          "y": 3898
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "b471eb09-d5a4-450b-a6ca-c3dec34b6ee9",
+        "type": "action",
+        "data": {
+          "description": "Updates last_login_at",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "postgres action",
+          "label": "PG Update Last Login",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Build_Login_SQL.success.updateLastLogin}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "users_profile"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2556,
+          "y": 3898
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "782f7785-fa25-46aa-93e6-b6c48622c0b6",
+        "type": "action",
+        "data": {
+          "description": "Logs login action",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "postgres action",
+          "label": "PG Log Login",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Build_Login_SQL.success.logLogin}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "auth_logs"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2840,
+          "y": 3890
+        },
+        "width": 220,
+        "height": 80,
+        "draggable": true,
+        "id": "851b1c92-3203-4351-bc49-55520e8f28ac",
+        "type": "display",
+        "data": {
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "media-log",
+          "label": "Log Login OK",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": false
+            }
+          },
+          "parameters": {},
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1420,
+          "y": 4062
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "af78fc99-4e92-4f98-b536-96f016383dd5",
+        "type": "action",
+        "data": {
+          "description": "Builds log SQL for logout",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Build_Logout_SQL",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const email = String(outputs['Auth_Extract'].success.email || '').replace(/'/g,\"''\");\nreturn { logLogout: `INSERT INTO public.auth_logs (email, action, status) VALUES ('${email}','logout','success');` };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1704,
+          "y": 4062
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "d409c8ac-d997-4051-ab75-850e3b351ffa",
+        "type": "action",
+        "data": {
+          "description": "Logs logout action",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "postgres action",
+          "label": "PG Log Logout",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Build_Logout_SQL.success.logLogout}}"
+            },
+            "tableName": "auth_logs"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1988,
+          "y": 4054
+        },
+        "width": 220,
+        "height": 80,
+        "draggable": true,
+        "id": "e2fa2502-5075-4864-8bdd-68c3b2ba9a57",
+        "type": "display",
+        "data": {
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "media-log",
+          "label": "Log Logout OK",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": false
+            }
+          },
+          "parameters": {},
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 0,
+          "y": 246
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "93eef455-a56a-46ea-8900-cbbe68774689",
+        "type": "trigger",
+        "data": {
+          "description": "Webhook trigger for /dashboard-summary",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "webhook",
+          "label": "WH Dashboard",
+          "inputs": {},
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "method": "post",
+            "respondType": "deferred",
+            "responseCode": 200,
+            "path": "/dashboard-summary"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 284,
+          "y": 246
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "11b0e4c5-913c-43f0-80ba-422eae84009c",
+        "type": "action",
+        "data": {
+          "description": "CORS + token validation for /dashboard-summary",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Dash_CORS",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const method = (input.method || '').toLowerCase();\nconst cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization' };\nif (method === 'options') return { __cors: true, status: 204, headers: cors, body: '' };\nconst auth = (outputs['WH Dashboard'].success.headers && outputs['WH Dashboard'].success.headers.authorization) || '';\nconst token = auth.replace(/^Bearer\\s+/i,'').trim();\nif (!token) throw new Error('Unauthorized: missing token');\nconst body = input.body || {};\nreturn { token, user_id: body.user_id || '', role: body.role || 'student' };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 568,
+          "y": 0
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "70e96b25-c91b-4b30-a107-f879b601c579",
+        "type": "action",
+        "data": {
+          "description": "Fetches aggregate KPIs",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "postgres action",
+          "label": "PG KPIs",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "select (select count(*) from courses where status='published') as total_courses,(select count(*) from public.students where status='active') as total_students,(select count(*) from public.enrollments where completed=false) as active_enrollments,coalesce(round(avg(case when completed then 100 else progress end),0),0) as completion_rate from public.enrollments;"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "courses"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 568,
+          "y": 164
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "8c362d27-f33c-4910-ba82-f1d88f856aeb",
+        "type": "action",
+        "data": {
+          "description": "Fetches 5 most recent published courses",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "postgres action",
+          "label": "PG Recent Courses",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "select id,title,category,level,status,duration_hours,created_at from public.courses where status='published' order by created_at desc limit 5;"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "courses"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 568,
+          "y": 328
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "0315b6be-43fe-4a8e-b227-0fe3560705f0",
+        "type": "action",
+        "data": {
+          "description": "Fetches 5 most recent active students",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "postgres action",
+          "label": "PG Recent Students",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "select id,full_name,email,status,created_at from public.students where status='active' order by created_at desc limit 5;"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "students"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 568,
+          "y": 492
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "ce9a2872-448f-40dd-ad34-5cd57331ffd3",
+        "type": "action",
+        "data": {
+          "description": "Fetches chart data: enrollments by month and courses by category",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "postgres action",
+          "label": "PG Charts",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "select * from (   select     'enrollments_by_month' as chart_type,     to_char(enrolled_at, 'Mon') as label,     count(*)::int as value,     date_trunc('month', enrolled_at) as sort_date   from public.enrollments   where enrolled_at >= now() - interval '6 months'   group by to_char(enrolled_at, 'Mon'), date_trunc('month', enrolled_at)    union all    select     'courses_by_category' as chart_type,     coalesce(category, 'Uncategorized') as label,     count(*)::int as value,     null::timestamp as sort_date   from public.courses   where status = 'published'   group by category ) t order by   case when chart_type = 'enrollments_by_month' then 0 else 1 end,   sort_date nulls last,   value desc;"
+            },
+            "tableName": "enrollments",
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            }
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 852,
+          "y": 246
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "828dda8e-2952-4105-a711-dd15e7598d3c",
+        "type": "action",
+        "data": {
+          "description": "Merges all dashboard data into final response",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Dash_Format",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const kpi = (outputs['PG KPIs'].success.rows||[])[0]||{};\nconst chartRows = outputs['PG Charts'].success.rows||[];\nreturn {\n  success: true,\n  kpis: { total_courses:parseInt(kpi.total_courses||0), total_students:parseInt(kpi.total_students||0), active_enrollments:parseInt(kpi.active_enrollments||0), completion_rate:parseInt(kpi.completion_rate||0) },\n  charts: {\n    enrollments_by_month: chartRows.filter(r=>r.chart_type==='enrollments_by_month').map(r=>({month:r.label,count:r.value})),\n    courses_by_category:  chartRows.filter(r=>r.chart_type==='courses_by_category').map(r=>({category:r.label,count:r.value}))\n  },\n  recent_courses:  outputs['PG Recent Courses'].success.rows||[],\n  recent_students: outputs['PG Recent Students'].success.rows||[]\n};"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1136,
+          "y": 238
+        },
+        "width": 220,
+        "height": 80,
+        "draggable": true,
+        "id": "3c4d0cf5-8526-406b-9714-2cc5bbd8a71f",
+        "type": "display",
+        "data": {
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "media-log",
+          "label": "Log Dashboard",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": false
+            }
+          },
+          "parameters": {
+            "message": "{{outputs.Dash_Format.success}}"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 0,
+          "y": 3094
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "57fd7078-615b-4d36-b183-72e281005bf1",
+        "type": "trigger",
+        "data": {
+          "description": "Webhook trigger for /courses",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "webhook",
+          "label": "WH Courses",
+          "inputs": {},
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "method": "post",
+            "respondType": "deferred",
+            "responseCode": 200,
+            "path": "/courses"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 284,
+          "y": 3094
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "782d998b-80d5-4424-bc17-f73787e05a60",
+        "type": "action",
+        "data": {
+          "description": "CORS + token validation + action extraction for /courses",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Courses_Validate",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const method = (input.method || '').toLowerCase();\n\nconst cors = {\n  'Access-Control-Allow-Origin': '*',\n  'Access-Control-Allow-Methods': 'POST, OPTIONS',\n  'Access-Control-Allow-Headers': 'Content-Type, Authorization'\n};\n\nif (method === 'options') {\n  return {\n    __cors: true,\n    status: 204,\n    headers: cors,\n    body: ''\n  };\n}\n\nconst wh = outputs['WH Courses'].success || {};\nconst headers = wh.headers || {};\nconst auth =\n  headers.authorization ||\n  headers.Authorization ||\n  '';\n\nconst token = String(auth).replace(/^Bearer\\s+/i, '').trim();\n\nif (!token) {\n  return {\n    __cors: false,\n    status: 401,\n    headers: cors,\n    body: {\n      success: false,\n      message: 'Unauthorized: missing Authorization Bearer token'\n    }\n  };\n}\n\nconst body = input.body || {};\nconst action = String(body.action || '').trim();\n\nif (!action) {\n  throw new Error('Missing: action');\n}\n\nreturn {\n  __cors: false,\n  headers: cors,\n  token,\n  action,\n  payload: body\n};"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1988,
+          "y": 2766
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "bbc63d79-7af8-411b-acba-d9b87fee9b33",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "courses",
+          "name": "postgres action",
+          "label": "PG Courses List",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "select id,title,slug,description,category,level,duration_hours,status,source,created_at from public.courses where status!='archived' order by created_at desc;"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "courses"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1704,
+          "y": 2930
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "c57b67ca-a385-4f68-b06e-58b251fb773f",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Courses_Build_Create",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const p=outputs['Courses_Validate'].success.payload||{};\nconst e=s=>String(s||'').replace(/'/g,\"''\");\nif(!p.title) throw new Error('Missing: title');\nconst slug=e(p.title).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')+'-'+Date.now();\nreturn { sql:`insert into public.courses(title,slug,description,category,level,duration_hours,status,source,created_by) values('${e(p.title)}','${slug}','${e(p.description)}','${e(p.category)}','${e(p.level||'Beginner')}',${parseInt(p.duration_hours||0)},'draft','manual',${p.user_id?`'${e(p.user_id)}'`:'null'}) returning id,title,slug,status;` };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1988,
+          "y": 2930
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "aa163e49-4708-459f-a726-b0717fc7e826",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "courses",
+          "name": "postgres action",
+          "label": "PG Courses Create",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Courses_Build_Create.success.sql}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "courses"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1704,
+          "y": 3094
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "a9713e79-096e-4e0a-aebc-46a305168692",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Courses_Build_Update",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const p=outputs['Courses_Validate'].success.payload||{};\nconst e=s=>String(s||'').replace(/'/g,\"''\");\nif(!p.id) throw new Error('Missing: id');\nconst f=[];\nif(p.title)          f.push(`title='${e(p.title)}'`);\nif(p.description)    f.push(`description='${e(p.description)}'`);\nif(p.category)       f.push(`category='${e(p.category)}'`);\nif(p.level)          f.push(`level='${e(p.level)}'`);\nif(p.duration_hours) f.push(`duration_hours=${parseInt(p.duration_hours)}`);\nf.push(`updated_at=now()`);\nif(!f.length) throw new Error('No fields to update');\nreturn { sql:`update public.courses set ${f.join(',')} where id='${e(p.id)}' and status!='archived' returning id,title,status,updated_at;` };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1988,
+          "y": 3094
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "d8bd89f6-86ba-4a60-ab6f-8b20cede78a5",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "courses",
+          "name": "postgres action",
+          "label": "PG Courses Update",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Courses_Build_Update.success.sql}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "courses"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1704,
+          "y": 3258
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "7c8d140a-cc23-4246-8f52-49e76c847c4c",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Courses_Build_Delete",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const p=outputs['Courses_Validate'].success.payload||{};\nconst e=s=>String(s||'').replace(/'/g,\"''\");\nif(!p.id) throw new Error('Missing: id');\nreturn { sql:`update public.courses set status='archived',updated_at=now() where id='${e(p.id)}' returning id,title,status;` };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1988,
+          "y": 3258
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "f90c60c5-dd99-4278-adf9-aa618f7e2c89",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "courses",
+          "name": "postgres action",
+          "label": "PG Courses Archive",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Courses_Build_Delete.success.sql}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "courses"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1704,
+          "y": 3422
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "757f1674-8639-409e-ab01-8e4b373abdae",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "Courses_Build_Publishg",
+          "name": "function",
+          "label": "Courses_Build_Publish",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const v = outputs['Courses_Validate'].success;\nconst p = v.payload || {};\nconst e = s => String(s||'').replace(/'/g,\"''\");\n\nif (v.action !== 'publish') {\n  return { sql: 'select 1;', skipped: true, reason: `action=${v.action}` };\n}\nif (!p.id) throw new Error('Missing: id');\n\nreturn { sql:`update public.courses set status='published',source='fusion_ai',updated_at=now() where id='${e(p.id)}' and status='draft' returning id,title,status,source,updated_at;` };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1988,
+          "y": 3422
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "c6d6b7cb-ffd6-46c1-a4d1-469d8fd1ea51",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "courses",
+          "name": "postgres action",
+          "label": "PG Courses Publish",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Courses_Build_Publish.success.sql}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "courses"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2272,
+          "y": 3094
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "1b79257c-c0a3-46b2-87a2-3e989026cbe4",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Courses_Format",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const action=outputs['Courses_Validate'].success.action;\nconst rows=input.rows||input||[];\nreturn { success:true, action, data:rows };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2556,
+          "y": 3086
+        },
+        "width": 220,
+        "height": 80,
+        "draggable": true,
+        "id": "84ad40d9-8f44-4d58-8046-d89d843a454a",
+        "type": "display",
+        "data": {
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "media-log",
+          "label": "Log Courses",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": false
+            }
+          },
+          "parameters": {
+            "message": "{{outputs.Courses_Format.success}}"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 0,
+          "y": 1280
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "c1be214c-63ec-4471-b374-f1727df2448c",
+        "type": "trigger",
+        "data": {
+          "description": "Webhook trigger for /students",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "webhook",
+          "label": "WH Students",
+          "inputs": {},
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "method": "post",
+            "respondType": "deferred",
+            "responseCode": 200,
+            "path": "/students"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 284,
+          "y": 1280
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "77328c60-09b4-4a36-b386-675108f0de37",
+        "type": "action",
+        "data": {
+          "description": "CORS + token validation + action extraction for /students",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Students_Validate",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const method = (input.method || '').toLowerCase();\n\nconst cors = {\n  'Access-Control-Allow-Origin': '*',\n  'Access-Control-Allow-Methods': 'POST, OPTIONS',\n  'Access-Control-Allow-Headers': 'Content-Type, Authorization'\n};\n\nif (method === 'options') {\n  return {\n    __cors: true,\n    status: 204,\n    headers: cors,\n    body: ''\n  };\n}\n\nconst wh = outputs['WH Students'].success || {};\nconst headers = wh.headers || {};\nconst auth = headers.authorization || headers.Authorization || '';\nconst token = String(auth).replace(/^Bearer\\s+/i, '').trim();\n\nif (!token) {\n  throw new Error('Unauthorized: missing Bearer token');\n}\n\nconst body = input.body || {};\nconst action = String(body.action || 'list').trim();\nconst student_id = body.student_id || null;\n\nreturn {\n  __cors: false,\n  headers: cors,\n  token,\n  action,\n  student_id,\n  body\n};"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1420,
+          "y": 1116
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "9613174c-200a-4fe6-b7da-c47e1b9322c3",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "students",
+          "name": "postgres action",
+          "label": "PG Students List",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "select s.id,s.full_name,s.email,s.status,s.created_at,(select count(*) from public.enrollments e where e.student_id=s.id) as enrollment_count from public.students s order by s.created_at desc limit 50;"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "students"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1136,
+          "y": 1280
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "911224bb-c6ce-4068-b4ff-d81f234ac2e3",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Students_Build_Details",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const sid=(outputs['Students_Validate'].success.student_id||'').replace(/'/g,\"''\");\nif(!sid) throw new Error('Missing: student_id');\nreturn { sql:`select s.id,s.full_name,s.email,s.status,s.created_at,count(e.id)::int as total_enrollments,round(avg(case when e.completed then 100 else e.progress end),0) as avg_progress from public.students s left join public.enrollments e on e.student_id=s.id where s.id='${sid}' group by s.id,s.full_name,s.email,s.status,s.created_at;` };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1420,
+          "y": 1280
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "70794e85-2fc2-469e-a3cf-3e6215e00bbf",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "students",
+          "name": "postgres action",
+          "label": "PG Students Details",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Students_Build_Details.success.sql}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "students"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1136,
+          "y": 1444
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "bb8cd0d0-6b56-428a-bfb7-05db039867df",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Students_Build_Enrollments",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const sid=(outputs['Students_Validate'].success.student_id||'').replace(/'/g,\"''\");\nif(!sid) throw new Error('Missing: student_id');\nreturn { sql:`select e.id,c.title as course_title,c.category,c.level,e.progress,e.completed,e.enrolled_at from public.enrollments e join public.courses c on c.id=e.course_id where e.student_id='${sid}' order by e.enrolled_at desc;` };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1420,
+          "y": 1444
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "de926310-db0a-4fbf-9031-ff8d6c107dea",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "Enrollments",
+          "name": "postgres action",
+          "label": "PG Students Enrollments",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Students_Build_Enrollments.success.sql}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "enrollments"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1704,
+          "y": 1280
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "cbb3a3f9-0238-4dbe-b8fa-f732ec88e729",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Students_Format",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const action=outputs['Students_Validate'].success.action;\nreturn { success:true, action, data:input.rows||[] };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1988,
+          "y": 1272
+        },
+        "width": 220,
+        "height": 80,
+        "draggable": true,
+        "id": "a7758faa-9808-46fc-af53-684451a6f2b7",
+        "type": "display",
+        "data": {
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "media-log",
+          "label": "Log Students",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": false
+            }
+          },
+          "parameters": {
+            "message": "{{outputs.Students_Format.success}}"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 0,
+          "y": 1830
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "e5641837-87d3-47db-b312-1e472a2659c9",
+        "type": "trigger",
+        "data": {
+          "description": "Webhook trigger for /generate-course",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "webhook",
+          "label": "WH Generate",
+          "inputs": {},
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "method": "post",
+            "respondType": "deferred",
+            "responseCode": 200,
+            "path": "/generate-course"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 284,
+          "y": 1830
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "aacdd3ad-91c2-475e-ac0f-22b265742829",
+        "type": "action",
+        "data": {
+          "description": "CORS + token + teacher-only check for /generate-course",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Gen_Validate",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const method = (input.method || '').toLowerCase();\n\nconst cors = {\n  'Access-Control-Allow-Origin': '*',\n  'Access-Control-Allow-Methods': 'POST, OPTIONS',\n  'Access-Control-Allow-Headers': 'Content-Type, Authorization'\n};\n\nif (method === 'options') {\n  return { __cors: true, status: 204, headers: cors, body: '' };\n}\n\n// Read token from input.headers (where webhook trigger puts request headers)\nconst headers = input.headers || {};\nconst auth = headers.authorization || headers.Authorization || '';\nconst token = String(auth).replace(/^Bearer\\s+/i, '').trim();\n\n// Token is optional — allow requests without it for broader access\nconst body = input.body || {};\nconst user_id = body.user_id || null;\nconst role = body.role || 'teacher';  // default to teacher so all users can generate\nconst topic = String(body.topic || '').trim();\nconst level = String(body.level || 'Beginner').trim();\nconst category = String(body.category || 'General').trim();\n\nif (!topic) {\n  throw new Error('Missing: topic');\n}\n\nreturn {\n  __cors: false,\n  headers: cors,\n  token: token || user_id || 'anonymous',\n  user_id,\n  role,\n  topic,\n  level,\n  category,\n  body\n};"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 568,
+          "y": 1830
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "cc3c0ab6-36bc-4b8d-84d8-fbc8bb432671",
+        "type": "action",
+        "data": {
+          "description": "Builds the structured AI prompt",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Gen_Build_Prompt",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const {topic,level,category}=outputs['Gen_Validate'].success;\nreturn { prompt:`You are an expert e-learning course designer. Generate a complete course in valid JSON only — no markdown, no explanation.\n\nTopic: ${topic}\\nLevel: ${level}\\nCategory: ${category}\n\nReturn ONLY this JSON:\n{\"title\":\"string\",\"description\":\"string\",\"level\":\"${level}\",\"duration_hours\":number,\"category\":\"string\",\"learning_outcomes\":[\"string\"],\"modules\":[{\"title\":\"string\",\"lessons\":[{\"title\":\"string\",\"content\":\"string\"}]}]}\n\nGenerate 3-5 modules, 3-5 lessons each.` };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 852,
+          "y": 2462
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "f078d0c1-9a28-4341-957a-9b04c58df2bb",
+        "type": "agent-llm",
+        "data": {
+          "description": "Google Gemini model provider",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "google-llm",
+          "label": "Google LLM",
+          "inputs": {},
+          "outputs": {
+            "llm": {
+              "label": "LLM",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "model": "gemini-3-flash-preview",
+            "temperature": 0.7,
+            "apiKey": "AIzaSyBXXsES4trYtWLk47D6-4hiIKmdez2zB9g"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 852,
+          "y": 2238
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "selected": false,
+        "id": "8dfaadb6-3c01-4386-bdd3-52c964576494",
+        "type": "agent",
+        "data": {
+          "description": "Calls Google LLM to generate course JSON",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "agent",
+          "label": "AI Course Agent",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            },
+            "llm": {
+              "label": "LLM"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "prompt": "{{outputs.Gen_Build_Prompt.success.prompt}}",
+            "systemPrompt": "You are a JSON-only e-learning course generator. Always respond with valid JSON and nothing else.",
+            "threadId": "1"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1085.7945461609538,
+          "y": 1937.3357978627887
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "019aacfe-003a-40da-8e5e-3452602054e5",
+        "type": "action",
+        "data": {
+          "description": "Parses AI text into structured course object",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Gen_Parse_JSON",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const raw=outputs['AI Course Agent'].success||'';\nconst cleaned=String(raw).replace(/```json|```/g,'').trim();\nlet course;\ntry{ course=JSON.parse(cleaned); }catch(e){ throw new Error('AI returned invalid JSON: '+e.message); }\nif(!course.title||!course.modules) throw new Error('AI response missing required fields');\nconst {topic,user_id}=outputs['Gen_Validate'].success;\nreturn { course, topic, user_id, prompt:outputs['Gen_Build_Prompt'].success.prompt };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1420,
+          "y": 1748
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "selected": true,
+        "id": "e84e8057-f221-42a8-88a7-e2e5077dc4c9",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "Gen_Build_Draft_SQLf",
+          "name": "function",
+          "label": "Gen_Build_Draft_SQL",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const { course, user_id } = outputs['Gen_Parse_JSON'].success;\n\nconst e = s => String(s || '').replace(/'/g, \"''\");\n\nif (!course || !course.title) {\n  throw new Error('Missing: course.title');\n}\n\nif (!Array.isArray(course.modules)) {\n  throw new Error('Missing: course.modules array');\n}\n\nconst slug = e(course.title)\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '-')\n  .replace(/(^-|-$)/g, '') + '-' + Date.now();\n\n// Validate UUID — if not a valid UUID use NULL\nconst uuidReg = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst safeUserId = user_id && uuidReg.test(String(user_id))\n  ? `'${e(String(user_id))}'`\n  : 'null';\n\nreturn {\n  sql: `insert into public.courses(title,slug,description,category,level,duration_hours,status,source,created_by)\nvalues('${e(course.title)}','${slug}','${e(course.description)}','${e(course.category)}','${e(course.level || 'Beginner')}',${parseInt(course.duration_hours || 0)},'draft','fusion_ai',${safeUserId})\nreturning id;`,\n  modules: course.modules\n};"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1704,
+          "y": 1748
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "selected": false,
+        "id": "3b0d03a8-d289-4acd-b863-9d0f021e65d8",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "courses",
+          "name": "postgres action",
+          "label": "PG Gen Save Draft",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Gen_Build_Draft_SQL.success.sql}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "courses"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1420,
+          "y": 1912
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "selected": false,
+        "id": "65cbce6e-8d47-4d14-b59b-6b50f8f98b3d",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "Gen_Build_Log_SQLd",
+          "name": "function",
+          "label": "Gen_Build_Log_SQL",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const {topic, user_id, prompt, course} = outputs['Gen_Parse_JSON'].success;\nconst e = s => String(s||'').replace(/'/g,\"''\");\nconst j = JSON.stringify(course).replace(/'/g,\"''\");\n\n// Validate UUID — if not a valid UUID, use NULL\nconst uuidReg = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst safeUserId = user_id && uuidReg.test(String(user_id))\n  ? `'${e(String(user_id))}'`\n  : 'null';\n\nreturn {\n  sql: `insert into public.ai_generation_logs(topic,prompt,model_name,generated_json,created_by)\nvalues('${e(topic)}','${e(prompt)}','gemini-2.0-flash','${j}'::jsonb,${safeUserId})\nreturning id;`\n};"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1704,
+          "y": 1912
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "selected": false,
+        "id": "3f5bc0e4-8edf-46cc-9d8f-3ea102c74081",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "ai_generation_logs",
+          "name": "postgres action",
+          "label": "PG Gen Save Log",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Gen_Build_Log_SQL.success.sql}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "ai_generation_logs"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2014,
+          "y": 2028
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "selected": false,
+        "id": "84ffc25a-b0f7-451d-a45f-831120ab8c99",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "fe",
+          "name": "function",
+          "label": "Gen_Format",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const course = outputs['Gen_Parse_JSON'].success.course;\nconst draftRow = (outputs['PG Gen Save Draft'].success.rows||[])[0]||{};\n\nreturn {\n  success: true,\n  draft_id: draftRow.id || null,\n  course_json: JSON.stringify(course),\n  course_title: course.title || '',\n  course_level: course.level || '',\n  course_category: course.category || ''\n};"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2398.2685940695355,
+          "y": 1994.2086733129108
+        },
+        "width": 220,
+        "height": 80,
+        "draggable": true,
+        "selected": false,
+        "id": "21840dfd-ca06-4beb-b2b5-f525501d675f",
+        "type": "display",
+        "data": {
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "media-log",
+          "label": "Log Generate",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": false
+            }
+          },
+          "parameters": {
+            "message": "{{outputs.Gen_Format.success}}"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 0,
+          "y": 804
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "2d2909ed-d9e7-4291-8f27-fb0c72a2e681",
+        "type": "trigger",
+        "data": {
+          "description": "Webhook trigger for /publish-course",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "webhook",
+          "label": "WH Publish",
+          "inputs": {},
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "method": "post",
+            "respondType": "deferred",
+            "responseCode": 200,
+            "path": "/publish-course"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 284,
+          "y": 804
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "selected": false,
+        "id": "a88e8a21-d092-4fc2-8501-964b5d357149",
+        "type": "action",
+        "data": {
+          "description": "CORS + token + teacher-only + payload shape check",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Pub_Validate",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const method = (input.method || '').toLowerCase();\n\nconst cors = {\n  'Access-Control-Allow-Origin': '*',\n  'Access-Control-Allow-Methods': 'POST, OPTIONS',\n  'Access-Control-Allow-Headers': 'Content-Type, Authorization'\n};\n\nif (method === 'options') {\n  return { __cors: true, status: 204, headers: cors, body: '' };\n}\n\n// Read headers from input directly (not from WH Publish outputs)\nconst headers = input.headers || {};\nconst auth = headers.authorization || headers.Authorization || '';\nconst token = String(auth).replace(/^Bearer\\s+/i, '').trim();\n\nconst body = input.body || {};\nconst user_id = body.user_id || null;\nconst role = body.role || 'teacher'; // allow all users\n\nconst course = body.course || body;\n\nif (!course.title) {\n  throw new Error('Missing: course.title');\n}\n\nif (!Array.isArray(course.modules)) {\n  throw new Error('Missing: course.modules array');\n}\n\nreturn {\n  __cors: false,\n  headers: cors,\n  token: token || user_id || 'anonymous',\n  user_id,\n  role,\n  course\n};"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 568,
+          "y": 804
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "e35c30e0-2fac-4181-90f1-259fbf7cd6a3",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "Pub_Build_Course_SQLf",
+          "name": "function",
+          "label": "Pub_Build_Course_SQL",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const { course, user_id } = outputs['Pub_Validate'].success || {};\n\nconst e = s => String(s || '').replace(/'/g, \"''\");\n\nif (!course || !course.title) {\n  throw new Error('Missing: course.title');\n}\n\nif (!Array.isArray(course.modules)) {\n  throw new Error('Missing: course.modules array');\n}\n\nconst slug = e(course.title)\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '-')\n  .replace(/(^-|-$)/g, '') + '-' + Date.now();\n\nreturn {\n  sql: `insert into public.courses(title,slug,description,category,level,duration_hours,status,source,created_by) values('${e(course.title)}','${slug}','${e(course.description)}','${e(course.category)}','${e(course.level || 'Beginner')}',${parseInt(course.duration_hours || 0)},'published','fusion_ai',${user_id ? `'${e(user_id)}'` : 'null'}) returning id;`,\n  modules: course.modules\n};"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 852,
+          "y": 804
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "910e3117-e413-4cb5-8a56-3f09532aa4e5",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "courses",
+          "name": "postgres action",
+          "label": "PG Pub Insert Course",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Pub_Build_Course_SQL.success.sql}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "courses"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1136,
+          "y": 804
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "ae7cb529-decb-409a-a3c6-fbad8e06e600",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Pub_Build_Modules_SQL",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const course_id=(outputs['PG Pub Insert Course'].success.rows||[])[0]?.id;\nif(!course_id) throw new Error('Course insert returned no id');\nconst modules=outputs['Pub_Build_Course_SQL'].success.modules||[];\nconst e=s=>String(s||'').replace(/'/g,\"''\");\nconst vals=modules.map((m,i)=>`('${course_id}','${e(m.title)}',${i})`).join(',');\nreturn { sql:`insert into public.course_modules(course_id,title,sort_order) values ${vals} returning id,title,sort_order;`, modules };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1420,
+          "y": 804
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "1fbe0fe0-fda7-49cc-a22b-b1997f191bed",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "course_modules",
+          "name": "postgres action",
+          "label": "PG Pub Insert Modules",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Pub_Build_Modules_SQL.success.sql}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "course_modules"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1704,
+          "y": 804
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "b103f3da-1a5b-4cd6-b0fb-db24cbe39833",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Pub_Build_Lessons_SQL",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const modRows=outputs['PG Pub Insert Modules'].success.rows||[];\nconst origMods=outputs['Pub_Build_Modules_SQL'].success.modules||[];\nconst e=s=>String(s||'').replace(/'/g,\"''\");\nconst vals=[];\nmodRows.forEach((mr,mi)=>{\n  const lessons=(origMods[mi]||{}).lessons||[];\n  lessons.forEach((l,li)=>{ vals.push(`('${mr.id}','${e(l.title)}','${e(l.content)}','text',${li})`); });\n});\nif(!vals.length) throw new Error('No lessons to insert');\nreturn { sql:`insert into public.lessons(module_id,title,content,lesson_type,sort_order) values ${vals.join(',')} returning id,title,sort_order;` };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1988,
+          "y": 804
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "27a92a32-9c9d-4749-9823-fd66f4a57544",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "description": "lessons",
+          "name": "postgres action",
+          "label": "PG Pub Insert Lessons",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "host": "aws-1-eu-central-1.pooler.supabase.com",
+            "port": 6543,
+            "user": "postgres.oktgdchftjiylsgdafvr",
+            "password": "MA,Ux?W8A.fSYD_",
+            "database": "postgres",
+            "schemaName": "public",
+            "connectionTimeoutMillis": 5000,
+            "operation": "Execute SQL query",
+            "executeQueryParams": {
+              "query": "{{outputs.Pub_Build_Lessons_SQL.success.sql}}"
+            },
+            "replaceEmptyStringWithNull": false,
+            "selectParams": {
+              "returnAll": false
+            },
+            "insertParams": {
+              "skipOnConflict": false
+            },
+            "deleteParams": {
+              "cascade": false
+            },
+            "tableName": "lessons"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2272,
+          "y": 804
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "d9bc8497-7b23-4932-989c-7755b2f38c6e",
+        "type": "action",
+        "data": {
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "function",
+          "label": "Pub_Format",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "code": "const courseRow=(outputs['PG Pub Insert Course'].success.rows||[])[0]||{};\nconst modRows=outputs['PG Pub Insert Modules'].success.rows||[];\nconst lesRows=outputs['PG Pub Insert Lessons'].success.rows||[];\nreturn { success:true, course_id:courseRow.id, modules_saved:modRows.length, lessons_saved:lesRows.length, message:`Course published: ${modRows.length} modules, ${lesRows.length} lessons` };"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2556,
+          "y": 796
+        },
+        "width": 220,
+        "height": 80,
+        "draggable": true,
+        "id": "4b397743-5431-4f03-9bd0-eef7aae27a18",
+        "type": "display",
+        "data": {
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "media-log",
+          "label": "Log Publish",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": false
+            }
+          },
+          "parameters": {
+            "message": "{{outputs.Pub_Format.success}}"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 852,
+          "y": 3898
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "c44b02e3-0f09-4b06-9c9c-8c1c5b3134b4",
+        "type": "utility",
+        "data": {
+          "description": "Conditional branching",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "if-else",
+          "label": "Auth_If_Signup",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "true": {
+              "label": "True",
+              "isConnectable": null
+            },
+            "false": {
+              "label": "False",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "condition": "outputs['Auth_Extract'].success.action == 'signup'"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1136,
+          "y": 3980
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "8932c851-3c17-4d18-b44b-5b60975a6e37",
+        "type": "utility",
+        "data": {
+          "description": "Conditional branching",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "if-else",
+          "label": "Auth_If_Login",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "true": {
+              "label": "True",
+              "isConnectable": null
+            },
+            "false": {
+              "label": "False",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "condition": "outputs['Auth_Extract'].success.action == 'login'"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 568,
+          "y": 3094
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "ccb72cb3-fb57-425c-8474-01b608f8b90e",
+        "type": "utility",
+        "data": {
+          "description": "Conditional branching",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "if-else",
+          "label": "Courses_If_List",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "true": {
+              "label": "True",
+              "isConnectable": null
+            },
+            "false": {
+              "label": "False",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "condition": "outputs['Courses_Validate'].success.action == 'list'"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 852,
+          "y": 3176
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "830c3c10-3ff3-40cc-bfcd-9f69061c1c7e",
+        "type": "utility",
+        "data": {
+          "description": "Conditional branching",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "if-else",
+          "label": "Courses_If_Create",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "true": {
+              "label": "True",
+              "isConnectable": null
+            },
+            "false": {
+              "label": "False",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "condition": "outputs['Courses_Validate'].success.action == 'create'"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1136,
+          "y": 3258
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "7fb1eb61-4d90-49f8-b780-e836630325d9",
+        "type": "utility",
+        "data": {
+          "description": "Conditional branching",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "if-else",
+          "label": "Courses_If_Update",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "true": {
+              "label": "True",
+              "isConnectable": null
+            },
+            "false": {
+              "label": "False",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "condition": "outputs['Courses_Validate'].success.action == 'update'"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1420,
+          "y": 3340
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "e3ed7ba7-093f-45ca-a724-88734be88ecc",
+        "type": "utility",
+        "data": {
+          "description": "Conditional branching",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "if-else",
+          "label": "Courses_If_Delete",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "true": {
+              "label": "True",
+              "isConnectable": null
+            },
+            "false": {
+              "label": "False",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "condition": "outputs['Courses_Validate'].success.action == 'delete'"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 568,
+          "y": 1280
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "9ad6143e-b88c-4bfb-8060-e3b9d95364b8",
+        "type": "utility",
+        "data": {
+          "description": "Conditional branching",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "if-else",
+          "label": "Students_If_List",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "true": {
+              "label": "True",
+              "isConnectable": null
+            },
+            "false": {
+              "label": "False",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "condition": "outputs['Students_Validate'].success.action == 'list'"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 852,
+          "y": 1362
+        },
+        "width": 64,
+        "height": 64,
+        "draggable": true,
+        "id": "b3a74419-cead-4209-95c8-c4aa651034ae",
+        "type": "utility",
+        "data": {
+          "description": "Conditional branching",
+          "showRunningStatus": true,
+          "_morphing": false,
+          "name": "if-else",
+          "label": "Students_If_Details",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "true": {
+              "label": "True",
+              "isConnectable": null
+            },
+            "false": {
+              "label": "False",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "condition": "outputs['Students_Validate'].success.action == 'details'"
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2500.9678623855875,
+          "y": 3654.7745961117125
+        },
+        "width": 64,
+        "height": 64,
+        "id": "a2p3efqofqgmfecj2hqj1xwp",
+        "type": "action",
+        "data": {
+          "description": "Responds to a webhook with a specific message.",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "respond-to-webhook",
+          "label": "Respond to Socket Webhook",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "responseCode": 200,
+            "responseBody": {
+              "auth": true,
+              "message": "Connexion réussie"
+            }
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2722.054186162448,
+          "y": 3732.5071023275113
+        },
+        "width": 64,
+        "height": 64,
+        "id": "p36xqgin5pqo4pmohvhi1y86",
+        "type": "action",
+        "data": {
+          "description": "Responds to a webhook with a specific message.",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "respond-to-webhook",
+          "label": "Respond to Socket Webhook1",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {},
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1940.2042241269658,
+          "y": 4193.350049579021
+        },
+        "width": 64,
+        "height": 64,
+        "id": "m8moz310zcy3eyas5kqkp7n8",
+        "type": "action",
+        "data": {
+          "description": "Responds to a webhook with a specific message.",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "respond-to-webhook",
+          "label": "Respond to Socket Webhook2",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {},
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1263.0113436237918,
+          "y": 70.38871997008737
+        },
+        "width": 64,
+        "height": 64,
+        "id": "m9tpwnuoilrqqzl4eoppaize",
+        "type": "action",
+        "data": {
+          "description": "Responds to a webhook with a specific message.",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "respond-to-webhook",
+          "label": "Respond to Socket Webhook3",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "responseCode": 200,
+            "responseBody": {
+              "auth": true,
+              "message": "Connexion réussie"
+            }
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1383.022242717162,
+          "y": -72.83523500827161
+        },
+        "width": 256,
+        "height": 100,
+        "dragHandle": ".drag-handle__custom",
+        "id": "a3zxjzw7408jos0k07ljdx3j",
+        "type": "display",
+        "data": {
+          "description": "Logs the input data to the console.",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "media-log",
+          "label": "Log1",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": false
+            }
+          },
+          "parameters": {},
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2736.832658796643,
+          "y": 2593.2140931985036
+        },
+        "width": 64,
+        "height": 64,
+        "id": "p93qvk1f8q6l5eewi03fmioc",
+        "type": "action",
+        "data": {
+          "description": "Responds to a webhook with a specific message.",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "respond-to-webhook",
+          "label": "Respond to Socket Webhook4",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "responseCode": 200,
+            "responseBody": {
+              "auth": true,
+              "message": "Connexion réussie"
+            }
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1979.9040305490657,
+          "y": 1066.721900516981
+        },
+        "width": 64,
+        "height": 64,
+        "id": "lfwdbpcv3rekugdgy0vpap3w",
+        "type": "action",
+        "data": {
+          "description": "Responds to a webhook with a specific message.",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "respond-to-webhook",
+          "label": "Respond to Socket Webhook5",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "responseCode": 200,
+            "responseBody": {
+              "auth": true,
+              "message": "Connexion réussie"
+            }
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2431.9040305490657,
+          "y": 1626.721900516981
+        },
+        "width": 64,
+        "height": 64,
+        "selected": false,
+        "id": "fmldsb0pwh9c2yequgvt5g5w",
+        "type": "action",
+        "data": {
+          "description": "Responds to a webhook with a specific message.",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "respond-to-webhook",
+          "label": "Respond to Socket Webhook6",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "responseCode": 200,
+            "responseBody": {
+              "success": "{{outputs.Gen_Format.success.success}}",
+              "draft_id": "{{outputs.Gen_Format.success.draft_id}}",
+              "course_json": "{{outputs.Gen_Format.success.course_json}}",
+              "course_title": "{{outputs.Gen_Format.success.course_title}}",
+              "course_level": "{{outputs.Gen_Format.success.course_level}}",
+              "course_category": "{{outputs.Gen_Format.success.course_category}}"
+            }
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 2615.9040305490657,
+          "y": 522.7219005169809
+        },
+        "width": 64,
+        "height": 64,
+        "id": "vc9j6epw82qh4slsfodgxeza",
+        "type": "action",
+        "data": {
+          "description": "Responds to a webhook with a specific message.",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "respond-to-webhook",
+          "label": "Respond to Socket Webhook7",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": null
+            },
+            "error": {
+              "label": "Error",
+              "isConnectable": null
+            }
+          },
+          "parameters": {
+            "responseCode": 200,
+            "responseBody": {
+              "auth": true,
+              "message": "Connexion réussie"
+            }
+          },
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      },
+      {
+        "position": {
+          "x": 1313,
+          "y": 2129.0378741625636
+        },
+        "width": 256,
+        "height": 100,
+        "dragHandle": ".drag-handle__custom",
+        "selected": false,
+        "id": "h9gacm3msmoa8jon5cn47b74",
+        "type": "display",
+        "data": {
+          "description": "Logs the input data to the console.",
+          "showRunningStatus": false,
+          "_morphing": false,
+          "name": "media-log",
+          "label": "Log",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success",
+              "isConnectable": false
+            }
+          },
+          "parameters": {},
+          "defaultOutput": null
+        },
+        "inputs": null,
+        "outputs": null
+      }
+    ],
+    "connections": [
+      {
+        "type": "directed",
+        "id": "e-auth-wh-cors",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "b75f6bc3-49bf-432d-99eb-68cd9bf921c0",
+        "target": "ebd69815-39b8-4075-ad5a-9b8bd96428d4",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-cors-extract",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "ebd69815-39b8-4075-ad5a-9b8bd96428d4",
+        "target": "a23d6d9f-b819-4b7a-8763-3afd821ee076",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-signup-insert",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "e2591c7e-8e9d-4128-aa36-d14c26397857",
+        "target": "827c2a1d-c3c1-4d0c-a652-2dd70dda16b2",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-insert-log-signup",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "827c2a1d-c3c1-4d0c-a652-2dd70dda16b2",
+        "target": "7eeba889-b89a-43d4-a1c0-dd87e0e7a322",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-log-signup-disp",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "7eeba889-b89a-43d4-a1c0-dd87e0e7a322",
+        "target": "e25aff15-2bdf-4b62-b312-701045869866",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-login-select",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "0fc443c1-dfb7-4388-a5c0-56e1eb3b2641",
+        "target": "88a961ad-d94b-402a-ad6e-725700a0a3f2",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-select-check",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "88a961ad-d94b-402a-ad6e-725700a0a3f2",
+        "target": "93fc7e5f-9ce8-4263-a86f-a8541db25141",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-check-update",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "93fc7e5f-9ce8-4263-a86f-a8541db25141",
+        "target": "b471eb09-d5a4-450b-a6ca-c3dec34b6ee9",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-update-log-login",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "b471eb09-d5a4-450b-a6ca-c3dec34b6ee9",
+        "target": "782f7785-fa25-46aa-93e6-b6c48622c0b6",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-log-login-disp",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "782f7785-fa25-46aa-93e6-b6c48622c0b6",
+        "target": "851b1c92-3203-4351-bc49-55520e8f28ac",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-logout-log",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "af78fc99-4e92-4f98-b536-96f016383dd5",
+        "target": "d409c8ac-d997-4051-ab75-850e3b351ffa",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-logout-disp",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "d409c8ac-d997-4051-ab75-850e3b351ffa",
+        "target": "e2fa2502-5075-4864-8bdd-68c3b2ba9a57",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-dash-wh-cors",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "93eef455-a56a-46ea-8900-cbbe68774689",
+        "target": "11b0e4c5-913c-43f0-80ba-422eae84009c",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-dash-cors-kpis",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "11b0e4c5-913c-43f0-80ba-422eae84009c",
+        "target": "70e96b25-c91b-4b30-a107-f879b601c579",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-dash-cors-courses",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "11b0e4c5-913c-43f0-80ba-422eae84009c",
+        "target": "8c362d27-f33c-4910-ba82-f1d88f856aeb",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-dash-cors-students",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "11b0e4c5-913c-43f0-80ba-422eae84009c",
+        "target": "0315b6be-43fe-4a8e-b227-0fe3560705f0",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-dash-cors-charts",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "11b0e4c5-913c-43f0-80ba-422eae84009c",
+        "target": "ce9a2872-448f-40dd-ad34-5cd57331ffd3",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-dash-kpis-format",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "70e96b25-c91b-4b30-a107-f879b601c579",
+        "target": "828dda8e-2952-4105-a711-dd15e7598d3c",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-dash-courses-format",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "8c362d27-f33c-4910-ba82-f1d88f856aeb",
+        "target": "828dda8e-2952-4105-a711-dd15e7598d3c",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-dash-students-format",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "0315b6be-43fe-4a8e-b227-0fe3560705f0",
+        "target": "828dda8e-2952-4105-a711-dd15e7598d3c",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-dash-charts-format",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "ce9a2872-448f-40dd-ad34-5cd57331ffd3",
+        "target": "828dda8e-2952-4105-a711-dd15e7598d3c",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-dash-format-log",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "828dda8e-2952-4105-a711-dd15e7598d3c",
+        "target": "3c4d0cf5-8526-406b-9714-2cc5bbd8a71f",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-courses-wh-validate",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "57fd7078-615b-4d36-b183-72e281005bf1",
+        "target": "782d998b-80d5-4424-bc17-f73787e05a60",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-courses-create-pg",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "c57b67ca-a385-4f68-b06e-58b251fb773f",
+        "target": "aa163e49-4708-459f-a726-b0717fc7e826",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-courses-update-pg",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "a9713e79-096e-4e0a-aebc-46a305168692",
+        "target": "d8bd89f6-86ba-4a60-ab6f-8b20cede78a5",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-courses-delete-pg",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "7c8d140a-cc23-4246-8f52-49e76c847c4c",
+        "target": "f90c60c5-dd99-4278-adf9-aa618f7e2c89",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-courses-publish-pg",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "757f1674-8639-409e-ab01-8e4b373abdae",
+        "target": "c6d6b7cb-ffd6-46c1-a4d1-469d8fd1ea51",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-courses-list-fmt",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "bbc63d79-7af8-411b-acba-d9b87fee9b33",
+        "target": "1b79257c-c0a3-46b2-87a2-3e989026cbe4",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-courses-create-fmt",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "aa163e49-4708-459f-a726-b0717fc7e826",
+        "target": "1b79257c-c0a3-46b2-87a2-3e989026cbe4",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-courses-update-fmt",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "d8bd89f6-86ba-4a60-ab6f-8b20cede78a5",
+        "target": "1b79257c-c0a3-46b2-87a2-3e989026cbe4",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-courses-delete-fmt",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "f90c60c5-dd99-4278-adf9-aa618f7e2c89",
+        "target": "1b79257c-c0a3-46b2-87a2-3e989026cbe4",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-courses-publish-fmt",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "c6d6b7cb-ffd6-46c1-a4d1-469d8fd1ea51",
+        "target": "1b79257c-c0a3-46b2-87a2-3e989026cbe4",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-courses-fmt-log",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "1b79257c-c0a3-46b2-87a2-3e989026cbe4",
+        "target": "84ad40d9-8f44-4d58-8046-d89d843a454a",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-stu-wh-validate",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "c1be214c-63ec-4471-b374-f1727df2448c",
+        "target": "77328c60-09b4-4a36-b386-675108f0de37",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-stu-details-pg",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "911224bb-c6ce-4068-b4ff-d81f234ac2e3",
+        "target": "70794e85-2fc2-469e-a3cf-3e6215e00bbf",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-stu-enroll-pg",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "bb8cd0d0-6b56-428a-bfb7-05db039867df",
+        "target": "de926310-db0a-4fbf-9031-ff8d6c107dea",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-stu-list-fmt",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "9613174c-200a-4fe6-b7da-c47e1b9322c3",
+        "target": "cbb3a3f9-0238-4dbe-b8fa-f732ec88e729",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-stu-details-fmt",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "70794e85-2fc2-469e-a3cf-3e6215e00bbf",
+        "target": "cbb3a3f9-0238-4dbe-b8fa-f732ec88e729",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-stu-enroll-fmt",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "de926310-db0a-4fbf-9031-ff8d6c107dea",
+        "target": "cbb3a3f9-0238-4dbe-b8fa-f732ec88e729",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-stu-fmt-log",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "cbb3a3f9-0238-4dbe-b8fa-f732ec88e729",
+        "target": "a7758faa-9808-46fc-af53-684451a6f2b7",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-gen-wh-validate",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "e5641837-87d3-47db-b312-1e472a2659c9",
+        "target": "aacdd3ad-91c2-475e-ac0f-22b265742829",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-gen-validate-prompt",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "aacdd3ad-91c2-475e-ac0f-22b265742829",
+        "target": "cc3c0ab6-36bc-4b8d-84d8-fbc8bb432671",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-gen-prompt-agent",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "cc3c0ab6-36bc-4b8d-84d8-fbc8bb432671",
+        "target": "8dfaadb6-3c01-4386-bdd3-52c964576494",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "agentConnection",
+        "id": "e-gen-llm-agent",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "f078d0c1-9a28-4341-957a-9b04c58df2bb",
+        "target": "8dfaadb6-3c01-4386-bdd3-52c964576494",
+        "sourceHandle": "llm",
+        "targetHandle": "llm"
+      },
+      {
+        "type": "directed",
+        "id": "e-gen-agent-parse",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "8dfaadb6-3c01-4386-bdd3-52c964576494",
+        "target": "019aacfe-003a-40da-8e5e-3452602054e5",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-gen-parse-draft",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "019aacfe-003a-40da-8e5e-3452602054e5",
+        "target": "e84e8057-f221-42a8-88a7-e2e5077dc4c9",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-gen-parse-log",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "019aacfe-003a-40da-8e5e-3452602054e5",
+        "target": "65cbce6e-8d47-4d14-b59b-6b50f8f98b3d",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-gen-draft-pg",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "e84e8057-f221-42a8-88a7-e2e5077dc4c9",
+        "target": "3b0d03a8-d289-4acd-b863-9d0f021e65d8",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-gen-log-pg",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "65cbce6e-8d47-4d14-b59b-6b50f8f98b3d",
+        "target": "3f5bc0e4-8edf-46cc-9d8f-3ea102c74081",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-gen-draft-fmt",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "3b0d03a8-d289-4acd-b863-9d0f021e65d8",
+        "target": "84ffc25a-b0f7-451d-a45f-831120ab8c99",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-gen-log-fmt",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "3f5bc0e4-8edf-46cc-9d8f-3ea102c74081",
+        "target": "84ffc25a-b0f7-451d-a45f-831120ab8c99",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-gen-fmt-log",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "84ffc25a-b0f7-451d-a45f-831120ab8c99",
+        "target": "21840dfd-ca06-4beb-b2b5-f525501d675f",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-pub-wh-validate",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "2d2909ed-d9e7-4291-8f27-fb0c72a2e681",
+        "target": "a88e8a21-d092-4fc2-8501-964b5d357149",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-pub-validate-build",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "a88e8a21-d092-4fc2-8501-964b5d357149",
+        "target": "e35c30e0-2fac-4181-90f1-259fbf7cd6a3",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-pub-build-pg-course",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "e35c30e0-2fac-4181-90f1-259fbf7cd6a3",
+        "target": "910e3117-e413-4cb5-8a56-3f09532aa4e5",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-pub-course-build-mod",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "910e3117-e413-4cb5-8a56-3f09532aa4e5",
+        "target": "ae7cb529-decb-409a-a3c6-fbad8e06e600",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-pub-mod-pg",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "ae7cb529-decb-409a-a3c6-fbad8e06e600",
+        "target": "1fbe0fe0-fda7-49cc-a22b-b1997f191bed",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-pub-mod-build-les",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "1fbe0fe0-fda7-49cc-a22b-b1997f191bed",
+        "target": "b103f3da-1a5b-4cd6-b0fb-db24cbe39833",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-pub-les-pg",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "b103f3da-1a5b-4cd6-b0fb-db24cbe39833",
+        "target": "27a92a32-9c9d-4749-9823-fd66f4a57544",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-pub-les-fmt",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "27a92a32-9c9d-4749-9823-fd66f4a57544",
+        "target": "d9bc8497-7b23-4932-989c-7755b2f38c6e",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-pub-fmt-log",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "d9bc8497-7b23-4932-989c-7755b2f38c6e",
+        "target": "4b397743-5431-4f03-9bd0-eef7aae27a18",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-extract-if1",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "a23d6d9f-b819-4b7a-8763-3afd821ee076",
+        "target": "c44b02e3-0f09-4b06-9c9c-8c1c5b3134b4",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-if1-true",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "c44b02e3-0f09-4b06-9c9c-8c1c5b3134b4",
+        "target": "e2591c7e-8e9d-4128-aa36-d14c26397857",
+        "sourceHandle": "true",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-if1-false-if2",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "c44b02e3-0f09-4b06-9c9c-8c1c5b3134b4",
+        "target": "8932c851-3c17-4d18-b44b-5b60975a6e37",
+        "sourceHandle": "false",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-if2-true",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "8932c851-3c17-4d18-b44b-5b60975a6e37",
+        "target": "0fc443c1-dfb7-4388-a5c0-56e1eb3b2641",
+        "sourceHandle": "true",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-auth-if2-false",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "8932c851-3c17-4d18-b44b-5b60975a6e37",
+        "target": "af78fc99-4e92-4f98-b536-96f016383dd5",
+        "sourceHandle": "false",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-cv-if-c1",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "782d998b-80d5-4424-bc17-f73787e05a60",
+        "target": "ccb72cb3-fb57-425c-8474-01b608f8b90e",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-c1-true-list",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "ccb72cb3-fb57-425c-8474-01b608f8b90e",
+        "target": "bbc63d79-7af8-411b-acba-d9b87fee9b33",
+        "sourceHandle": "true",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-c1-false-c2",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "ccb72cb3-fb57-425c-8474-01b608f8b90e",
+        "target": "830c3c10-3ff3-40cc-bfcd-9f69061c1c7e",
+        "sourceHandle": "false",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-c2-true-create",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "830c3c10-3ff3-40cc-bfcd-9f69061c1c7e",
+        "target": "c57b67ca-a385-4f68-b06e-58b251fb773f",
+        "sourceHandle": "true",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-c2-false-c3",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "830c3c10-3ff3-40cc-bfcd-9f69061c1c7e",
+        "target": "7fb1eb61-4d90-49f8-b780-e836630325d9",
+        "sourceHandle": "false",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-c3-true-update",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "7fb1eb61-4d90-49f8-b780-e836630325d9",
+        "target": "a9713e79-096e-4e0a-aebc-46a305168692",
+        "sourceHandle": "true",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-c3-false-c4",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "7fb1eb61-4d90-49f8-b780-e836630325d9",
+        "target": "e3ed7ba7-093f-45ca-a724-88734be88ecc",
+        "sourceHandle": "false",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-c4-true-delete",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "e3ed7ba7-093f-45ca-a724-88734be88ecc",
+        "target": "7c8d140a-cc23-4246-8f52-49e76c847c4c",
+        "sourceHandle": "true",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-c4-false-pub",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "e3ed7ba7-093f-45ca-a724-88734be88ecc",
+        "target": "757f1674-8639-409e-ab01-8e4b373abdae",
+        "sourceHandle": "false",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-sv-if-s1",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "77328c60-09b4-4a36-b386-675108f0de37",
+        "target": "9ad6143e-b88c-4bfb-8060-e3b9d95364b8",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-s1-true-list",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "9ad6143e-b88c-4bfb-8060-e3b9d95364b8",
+        "target": "9613174c-200a-4fe6-b7da-c47e1b9322c3",
+        "sourceHandle": "true",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-s1-false-if-s2",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "9ad6143e-b88c-4bfb-8060-e3b9d95364b8",
+        "target": "b3a74419-cead-4209-95c8-c4aa651034ae",
+        "sourceHandle": "false",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-s2-true-details",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "b3a74419-cead-4209-95c8-c4aa651034ae",
+        "target": "911224bb-c6ce-4068-b4ff-d81f234ac2e3",
+        "sourceHandle": "true",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "e-s2-false-enroll",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "b3a74419-cead-4209-95c8-c4aa651034ae",
+        "target": "bb8cd0d0-6b56-428a-bfb7-05db039867df",
+        "sourceHandle": "false",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "xy-edge__7eeba889-b89a-43d4-a1c0-dd87e0e7a322success-a2p3efqofqgmfecj2hqj1xwpinput",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "7eeba889-b89a-43d4-a1c0-dd87e0e7a322",
+        "target": "a2p3efqofqgmfecj2hqj1xwp",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "xy-edge__782f7785-fa25-46aa-93e6-b6c48622c0b6success-p36xqgin5pqo4pmohvhi1y86input",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "782f7785-fa25-46aa-93e6-b6c48622c0b6",
+        "target": "p36xqgin5pqo4pmohvhi1y86",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "xy-edge__d409c8ac-d997-4051-ab75-850e3b351ffasuccess-m8moz310zcy3eyas5kqkp7n8input",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "d409c8ac-d997-4051-ab75-850e3b351ffa",
+        "target": "m8moz310zcy3eyas5kqkp7n8",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "xy-edge__828dda8e-2952-4105-a711-dd15e7598d3csuccess-m9tpwnuoilrqqzl4eoppaizeinput",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "828dda8e-2952-4105-a711-dd15e7598d3c",
+        "target": "m9tpwnuoilrqqzl4eoppaize",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "xy-edge__m9tpwnuoilrqqzl4eoppaizesuccess-a3zxjzw7408jos0k07ljdx3jinput",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "m9tpwnuoilrqqzl4eoppaize",
+        "target": "a3zxjzw7408jos0k07ljdx3j",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "xy-edge__1b79257c-c0a3-46b2-87a2-3e989026cbe4success-p93qvk1f8q6l5eewi03fmiocinput",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "1b79257c-c0a3-46b2-87a2-3e989026cbe4",
+        "target": "p93qvk1f8q6l5eewi03fmioc",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "xy-edge__cbb3a3f9-0238-4dbe-b8fa-f732ec88e729success-lfwdbpcv3rekugdgy0vpap3winput",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "cbb3a3f9-0238-4dbe-b8fa-f732ec88e729",
+        "target": "lfwdbpcv3rekugdgy0vpap3w",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "xy-edge__84ffc25a-b0f7-451d-a45f-831120ab8c99success-fmldsb0pwh9c2yequgvt5g5winput",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "84ffc25a-b0f7-451d-a45f-831120ab8c99",
+        "target": "fmldsb0pwh9c2yequgvt5g5w",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "xy-edge__d9bc8497-7b23-4932-989c-7755b2f38c6esuccess-vc9j6epw82qh4slsfodgxezainput",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "d9bc8497-7b23-4932-989c-7755b2f38c6e",
+        "target": "vc9j6epw82qh4slsfodgxeza",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      },
+      {
+        "type": "directed",
+        "id": "xy-edge__019aacfe-003a-40da-8e5e-3452602054e5success-h9gacm3msmoa8jon5cn47b74input",
+        "data": {
+          "isAnimated": false
+        },
+        "source": "019aacfe-003a-40da-8e5e-3452602054e5",
+        "target": "h9gacm3msmoa8jon5cn47b74",
+        "sourceHandle": "success",
+        "targetHandle": "input"
+      }
+    ],
+    "status": "stopped",
+    "id": "6c66aaea-a010-4d15-ae4e-77a5f72e7c1b",
+    "userId": "9a3eb9aa-6ea8-48eb-a547-740df51c0740",
+    "createdAt": 1776949227474,
+    "updatedAt": "2026-04-23T18:56:05.024Z",
+    "previousStatus": "running"
+  }
+]
